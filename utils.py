@@ -138,7 +138,13 @@ def sub_analys_list(event_list:list) -> list:
                 do = f"not_{seg[0]}"
                 seg[0] = "done"
             else:
-                if not do or do in ["do","call","is","like","love"]:
+                if not do:
+                    do = seg[0]
+                    seg[0] = "done"
+                    tmp = seg
+                elif do == "do":
+                    tmp[0] = "event"
+                    tmp[1] = "wait"
                     do = seg[0]
                     seg[0] = "done"
                 else:
@@ -263,8 +269,8 @@ def analys_event(event_list:list) -> dict:
         }
     tag = []
     for seg in event_list:
-        if seg[0] == "event" and seg[0] != "cut":
-            if seg[0] == "cut":
+        if seg[0] == "event":
+            if seg[1] == "cut":
                 continue
             else:
                 tag.append(seg[1])
@@ -309,12 +315,26 @@ def analys_event(event_list:list) -> dict:
                 elif "ask_like" in tag:
                     analys["tag"] = "ask_like"
                 else:
-                    analys["tag"] = tag
+                    analys["tag"] = tag_format(tag)
+            elif "wait" in tag:
+                if "love" in tag:
+                    analys["tag"] = "wait_love"
+                elif "like" in tag:
+                    analys["tag"] = "wait_like"
+                else:
+                    analys["tag"] = tag_format(tag)
             else:
                 analys["tag"] = tag[0]
         else:
             pass
     return analys
+
+def tag_format(tag:list) -> str:
+    output = set(tag) - {"ask","wait"}
+    if output:
+        return list(output)[0]
+    else:
+        return None
 
 def analys(msg:str) -> dict:
     if (not msg) or msg.isspace():

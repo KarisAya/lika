@@ -45,7 +45,7 @@ async def _(event: MessageEvent):
         else:
             await talk.finish(result)
 
-    # 从个人字典里获取结果（优先）
+    # 从个人字典里获取结果
     result = get_chat_result(MyThesaurus, msg)
     if result != None:
         await talk.finish(Message(result))
