@@ -1,0 +1,5 @@
+领养 v
+绒布球 n
+爸爸 nset
+姐姐 nset
+主人 nset
