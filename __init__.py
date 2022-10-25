@@ -11,16 +11,11 @@ import asyncio
 
 from nonebot import logger
 
-try:
-    import ujson as json
-except ModuleNotFoundError:
-    import json
-
-from .data_source import kawaii, Bot_NICKNAME
+from .data_source import lika, Bot_NICKNAME
 from .kawaii_robot import MyThesaurus, LeafThesaurus, AnimeThesaurus, get_chat_result, unknow_reply
 
 async def hello(event: MessageEvent) -> bool:
-    customer = kawaii.customer_data.get(str(event.user_id))
+    customer = lika.customer_data.get(str(event.user_id))
     if customer and customer["nickname"]:
         flag = event.message.extract_plain_text().startswith(customer["nickname"])
     else:
@@ -31,11 +26,10 @@ talk = on_message(rule = hello, priority = 99)
 
 @talk.handle()
 async def _(event: MessageEvent):
-    msg, nickname = kawaii.text(event)
+    msg, nickname = lika.text(event)
 
     # 从 lika 中获取结果
-    result = kawaii.lika(event)
-    if result:
+    if result := lika.lika(event):
         if isinstance(result,list):
             for x in result:
                 await talk.send(x)
@@ -46,18 +40,15 @@ async def _(event: MessageEvent):
             await talk.finish(result)
 
     # 从个人字典里获取结果
-    result = get_chat_result(MyThesaurus, msg)
-    if result != None:
+    if result := get_chat_result(MyThesaurus, msg):
         await talk.finish(Message(result))
 
     # 从 LeafThesaurus 里获取结果
-    result = get_chat_result(LeafThesaurus,msg)
-    if result:
+    if result := get_chat_result(LeafThesaurus,msg):
         await talk.finish(Message(result.replace("name", nickname)))
 
     # 从 AnimeThesaurus 里获取结果
-    result = get_chat_result(AnimeThesaurus,msg)
-    if result:
+    if result := get_chat_result(AnimeThesaurus,msg):
         await talk.finish(Message(result.replace("你", nickname)))
     
     # 不明白的内容

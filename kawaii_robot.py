@@ -47,16 +47,6 @@ with open(Path(path) / "leaf.json", "r", encoding="utf8") as f:
 with open(Path(path) / "data.json", "r", encoding="utf8") as f:
     AnimeThesaurus = json.load(f)
 
-hello__reply = [
-    "你好喵~",
-    "呜喵..？！",
-    "你好OvO",
-    f"喵呜 ~ ，叫{Bot_NICKNAME}做什么呢☆",
-    "怎么啦qwq",
-    "呜喵 ~ ，干嘛喵？",
-    "呼喵 ~ 叫可爱的咱有什么事嘛OvO"
-]
-
 unknow_reply = [
     f"{Bot_NICKNAME}不懂...",
     "呜喵？",

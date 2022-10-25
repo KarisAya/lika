@@ -38,27 +38,27 @@ action_event = [
 
 class Manager:
     def __init__(self):
-        self.file = Path(data_path / "data" / "kawaii" )
+        self.file = Path(data_path / "data" / "lika" )
         if self.file.exists():
             pass
         else:
             self.file.mkdir(parents=True, exist_ok=True)
 
-        self.customer_data_file = Path(data_path / "data" / "kawaii" / "customer_data.json")
+        self.customer_data_file = Path(data_path / "data" / "lika" / "customer_data.json")
         if self.customer_data_file.exists():
             with open(self.customer_data_file, "r", encoding="utf8") as f:
                 self.customer_data = json.load(f)
         else:
             self.customer_data = {}
 
-        self.group_data_file = Path(data_path / "data" / "kawaii" / "group_data.json")
+        self.group_data_file = Path(data_path / "data" / "lika" / "group_data.json")
         if self.group_data_file.exists():
             with open(self.group_data_file, "r", encoding="utf8") as f:
                 self.group_data = json.load(f)
         else:
             self.group_data = {}
 
-        self.replay_file = Path(data_path / "data" / "kawaii" / "replay_data.json")
+        self.replay_file = Path(data_path / "data" / "lika" / "replay_data.json")
         if self.replay_file.exists():
             with open(self.file, "r", encoding="utf8") as f:
                 self.replay_data = json.load(f)
@@ -67,11 +67,11 @@ class Manager:
 
     class save():
         def customer_data():
-            with open(kawaii.customer_data_file, "w", encoding="utf8") as f:
-                json.dump(kawaii.customer_data, f, ensure_ascii = False, indent = 4)
+            with open(lika.customer_data_file, "w", encoding="utf8") as f:
+                json.dump(lika.customer_data, f, ensure_ascii = False, indent = 4)
         def group_data():
-            with open(kawaii.group_data_file, "w", encoding="utf8") as f:
-                json.dump(kawaii.group_data, f, ensure_ascii = False, indent = 4)
+            with open(lika.group_data_file, "w", encoding="utf8") as f:
+                json.dump(lika.group_data, f, ensure_ascii = False, indent = 4)
 
     def text(self, event: MessageEvent) -> str:
         """
@@ -99,25 +99,29 @@ class Manager:
         """
         user_id = str(event.user_id)
         if self.customer_data.get(user_id):
+            self.customer_data[user_id]["customer"]["sex"] = event.sender.sex
             self.customer_data[user_id]["customer"]["name"] = event.sender.nickname or event.sender.card
             return False
         else:
             self.customer_data[user_id] = {
                 "customer":{
                     "id":event.user_id,
+                    "sex":event.sender.sex,
                     "name":event.sender.nickname or event.sender.card,
                     "nickname":"",
+                    "title":"",
                     },
                 "nickname":"",
+                "title":"",
+                "countdown":0,
+                "cd":time.time(),
                 "lika":0,
                 "love":50,
                 "happy":50,
-                "countdown":0,
-                "cd":time.time(),
                 "todo":"nothing",
-                "done":"nothing",
-                "talk":[],
-                "memory":[]
+                "do":"nothing",
+                "done":[],
+                "memory":{}
                 }
             self.save.customer_data()
             return True
@@ -142,11 +146,11 @@ class Manager:
                 customer["cd"] = time.time()
         else:
             customer["countdown"] -= 1
-            customer["done"] = customer["todo"]
+            customer["do"] = customer["todo"]
             customer["todo"] = data["tag"]
-            customer["memory"].append(data["tag"])
-            while len(customer["memory"]) > 5:
-                del customer["memory"][0]
+            customer["done"].append(data["tag"])
+            while len(customer["done"]) > 5:
+                del customer["done"][0]
 
         if customer["countdown"] < 1:
             customer["lika"] += random.randint(0,5)
@@ -193,8 +197,8 @@ class Manager:
         """
         事件处理中心
         """
-        flag = self.sign(event)
         data = analys(event.message.extract_plain_text())
+        flag = self.sign(event)
         customer = self.customer_data[str(event.user_id)]
         if flag:
             tag = data["tag"]
@@ -241,89 +245,102 @@ class Manager:
         else:
             self.action(customer,data)
             tag = customer["todo"]
-            memory = customer["memory"][:-1]
+            done = customer["done"][:-1]
             if tag == "hello":
                 return self.hello().normal(customer)
             elif tag == "like":
-                if "not_like" in memory:
-                    return 
-                elif "not_love" in memory:
-                    return
+                if "not_like" in done or "not_love" in done:
+                    return self.like().difficult(customer)
                 else:
                     return self.like().normal(customer)
             elif tag == "love":
-                if "not_like" in memory:
-                    return 
-                elif "not_love" in memory:
-                    return
+                if "not_like" in done or "not_love" in done:
+                    return self.love().difficult(customer)
                 else:
                     return self.love().normal(customer)
+            elif tag == "unfriendly":
+                return self.negative().unfriendly(customer)
+            elif tag == "not_like":
+                return self.negative().not_like(customer)
+            elif tag == "not_love":
+                return self.negative().not_love(customer)
             elif tag == "wait_like":
-                if "not_like" in memory:
-                    return 
-                elif "not_love" in memory:
-                    return
+                if "not_like" in done or "not_love" in done:
+                    return self.wait_like().difficult(customer)
                 else:
                     return self.wait_like().normal(customer)
+            elif tag == "wait_like_re":
+                if "not_like" in done or "not_love" in done:
+                    return self.wait_like().difficult_reply(customer)
+                else:
+                    return self.wait_like().reply(customer)
             elif tag == "wait_love":
-                if "not_like" in memory:
-                    return 
-                elif "not_love" in memory:
-                    return
+                if "not_like" in done or "not_love" in done:
+                    return self.wait_love().difficult(customer)
                 else:
                     return self.wait_love().normal(customer)
-            elif tag == "wait_like_re":
-                if "not_like" in memory:
-                    return 
-                elif "not_love" in memory:
-                    return
-                else:
-                    return self.wait_like_re().normal(customer)
             elif tag == "wait_love_re":
-                if "not_like" in memory:
-                    return 
-                elif "not_love" in memory:
-                    return
+                if "not_like" in done or "not_love" in done:
+                    return self.wait_love().difficult_reply(customer)
                 else:
-                    return self.wait_love_re().normal(customer)
+                    return self.wait_love().reply(customer)
             elif tag == "ask_selfname":
-                if "ask_selfname" in memory:
+                if "ask_selfname" in done:
                     return self.ask_selfname().repeat(customer)
-                elif "set_selfname" in memory:
+                elif "set_selfname" in done:
                     return self.ask_selfname().new(customer)
                 else:
                     return self.ask_selfname().normal(customer)
             elif tag == "ask_customername":
-                if "set_customername" in memory:
-                    return self.ask_customername().normal(customer)
-                elif "ask_customername" in memory:
-                    return self.ask_customername().normal(customer)
+                if "set_customername" in done:
+                    return self.ask_customername().repeat(customer)
+                elif "ask_customername" in done:
+                    return self.ask_customername().new(customer)
                 else:
                     return self.ask_customername().normal(customer)
             elif tag == "set_selfname":
-                if "set_selfname" in memory:
+                if "set_selfname" in done:
                     return self.set_selfname().repeat(customer, data)
                 else:
                     return self.set_selfname().normal(customer, data)
             elif tag == "set_customername":
-                if "set_customername" in memory:
+                if "set_customername" in done:
                     return self.set_customername().repeat(customer, data)
                 else:
                     return self.set_customername().normal(customer, data)
+            elif tag == "set_customername":
+                if "set_customername" in done:
+                    return self.set_customername().repeat(customer, data)
+                else:
+                    return self.set_customername().normal(customer, data)
+            elif tag == "set_selfis":
+                return self.memory().set_selfis(customer, data)
+            elif tag == "whatis_self":
+                return self.memory().whatis_self(customer, data)
+            elif tag == "set_customeris":
+                return self.memory().set_customeris(customer, data)
+            elif tag == "whatis_customer":
+                return self.memory().whatis_customer(customer, data)
+            elif tag == "set_otheris":
+                return self.memory().set_otheris(customer, data)
+            elif tag == "whatis_other":
+                return self.memory().whatis_other(customer, data)
 
     class hello():
         def __init__(self):
-            self.replay_data = kawaii.replay_data["hello"]
+            self.replay_data = lika.replay_data["hello"]
+
         def normal(self, customer: dict):
             """
             你好！
             """
-            msg = kawaii.replay(customer, self.replay_data["normal"], False)
+            msg = lika.replay(customer, self.replay_data["normal"], False)
             return msg
 
     class like():
         def __init__(self):
-            self.replay_data = kawaii.replay_data["like"]
+            self.replay_data = lika.replay_data["like"]
+
         def normal(self, customer: dict):
             """
             喜欢你！
@@ -337,11 +354,29 @@ class Manager:
                 else:
                     customer["happy"] += pt
                     log = f"心情+{pt}"
-                kawaii.save.customer_data()
+                lika.save.customer_data()
             else:
                 log = ""
 
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["normal"])
+            if log:
+                msg = msg + f"（{log}）"
+
+            return msg
+
+        def difficult(self, customer: dict):
+            """
+            喜欢你！（闹别扭）
+            """
+            pt = customer["lika"]
+            if pt > 0:
+                customer["lika"] = 0
+                customer["happy"] += random.randint(2*pt,4*pt)
+                log = f"心情+{pt}"
+                lika.save.customer_data()
+            else:
+                log = ""
+            msg = lika.replay(customer, self.replay_data["difficult"])
             if log:
                 msg = msg + f"（{log}）"
 
@@ -349,7 +384,8 @@ class Manager:
 
     class love():
         def __init__(self):
-            self.replay_data = kawaii.replay_data["love"]
+            self.replay_data = lika.replay_data["love"]
+
         def normal(self, customer: dict):
             """
             爱你！
@@ -362,11 +398,100 @@ class Manager:
                 pt1 = random.randint(pt,2*pt)
                 customer["happy"] += pt1
                 log = f"好感度+{pt0}，心情+{pt1}"
-                kawaii.save.customer_data()
+                lika.save.customer_data()
             else:
                 log = ""
 
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["normal"])
+            if log:
+                msg = msg + f"（{log}）"
+
+            return msg
+
+        def difficult(self, customer: dict):
+            """
+            爱你！（闹别扭）
+            """
+            pt = customer["lika"]
+            if pt > 0:
+                customer["lika"] = 0
+                customer["love"] += random.randint(2*pt,4*pt)
+                log = f"好感度+{pt}"
+                lika.save.customer_data()
+            else:
+                log = ""
+
+            msg = lika.replay(customer, self.replay_data["difficult"])
+            if log:
+                msg = msg + f"（{log}）"
+
+            return msg
+
+    class negative():
+        def __init__(self):
+            self.replay_data = lika.replay_data["love"]
+
+        def unfriendly(self, customer: dict):
+            """
+            不友好。
+            """
+            pt = customer["lika"]
+            if pt > 0:
+                customer["lika"] = 0
+                pt0 = random.randint(pt,2*pt)
+                customer["love"] += pt0
+                pt1 = random.randint(pt,2*pt)
+                customer["happy"] += pt1
+                log = f"好感度+{pt0}，心情+{pt1}"
+                lika.save.customer_data()
+            else:
+                log = ""
+
+            msg = lika.replay(customer, self.replay_data["normal"])
+            if log:
+                msg = msg + f"（{log}）"
+
+            return msg
+
+        def not_like(self, customer: dict):
+            """
+            不喜欢你了。
+            """
+            pt = customer["lika"]
+            if pt > 0:
+                customer["lika"] = 0
+                pt0 = random.randint(pt,2*pt)
+                customer["love"] += pt0
+                pt1 = random.randint(pt,2*pt)
+                customer["happy"] += pt1
+                log = f"好感度+{pt0}，心情+{pt1}"
+                lika.save.customer_data()
+            else:
+                log = ""
+
+            msg = lika.replay(customer, self.replay_data["normal"])
+            if log:
+                msg = msg + f"（{log}）"
+
+            return msg
+
+        def not_love(self, customer: dict):
+            """
+            不爱你了。
+            """
+            pt = customer["lika"]
+            if pt > 0:
+                customer["lika"] = 0
+                pt0 = random.randint(pt,2*pt)
+                customer["love"] += pt0
+                pt1 = random.randint(pt,2*pt)
+                customer["happy"] += pt1
+                log = f"好感度+{pt0}，心情+{pt1}"
+                lika.save.customer_data()
+            else:
+                log = ""
+
+            msg = lika.replay(customer, self.replay_data["normal"])
             if log:
                 msg = msg + f"（{log}）"
 
@@ -374,7 +499,8 @@ class Manager:
 
     class wait_like():
         def __init__(self):
-            self.replay_data = kawaii.replay_data["wait_like"]
+            self.replay_data = lika.replay_data["wait_like"]
+
         def normal(self, customer: dict):
             """
             说喜欢我！
@@ -384,11 +510,56 @@ class Manager:
                 customer["lika"] -= 1
                 customer["happy"] += 1
                 log = "心情+1"
-                kawaii.save.customer_data()
+                lika.save.customer_data()
             else:
                 log = ""
 
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["normal"])
+            if log:
+                msg = msg + f"（{log}）"
+
+            return msg
+
+        def difficult(self, customer: dict):
+            """
+            说喜欢我！（闹别扭）
+            """
+            pt = customer["lika"]
+            if pt > 0:
+                customer["lika"] -= 1
+                customer["happy"] += 2
+                log = "心情+2"
+                lika.save.customer_data()
+            else:
+                log = ""
+
+            msg = lika.replay(customer, self.replay_data["difficult"])
+            if log:
+                msg = msg + f"（{log}）"
+
+            return msg
+
+        def reply(self, customer: dict):
+            """
+            喜欢我吗？
+            """
+            msg = lika.replay(customer, self.replay_data["reply"])
+            return msg
+
+        def difficult_reply(self, customer: dict):
+            """
+            喜欢我吗？（闹别扭）
+            """
+            pt = customer["lika"]
+            if pt > 0:
+                customer["lika"] -= 2
+                customer["happy"] += 2
+                log = "心情+1"
+                lika.save.customer_data()
+            else:
+                log = ""
+
+            msg = lika.replay(customer, self.replay_data["difficult_reply"])
             if log:
                 msg = msg + f"（{log}）"
 
@@ -396,7 +567,8 @@ class Manager:
 
     class wait_love():
         def __init__(self):
-            self.replay_data = kawaii.replay_data["wait_love"]
+            self.replay_data = lika.replay_data["wait_love"]
+
         def normal(self, customer: dict):
             """
             说爱我！
@@ -406,55 +578,56 @@ class Manager:
                 customer["lika"] -= 1
                 customer["love"] += 1
                 log = "好感度+1"
-                kawaii.save.customer_data()
+                lika.save.customer_data()
             else:
                 log = ""
 
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["normal"])
             if log:
                 msg = msg + f"（{log}）"
 
             return msg
 
-    class wait_like_re():
-        def __init__(self):
-            self.replay_data = kawaii.replay_data["wait_like_re"]
-        def normal(self, customer: dict):
+        def difficult(self, customer: dict):
             """
-            不喜欢我嘛！
+            说爱我！（闹别扭）
             """
             pt = customer["lika"]
             if pt > 0:
                 customer["lika"] -= 1
-                customer["love"] += 1
-                log = "好感度+1"
-                kawaii.save.customer_data()
+                customer["love"] += 2
+                log = "好感度+2"
+                lika.save.customer_data()
             else:
                 log = ""
 
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["difficult"])
             if log:
                 msg = msg + f"（{log}）"
 
             return msg
-            
-    class wait_love_re():
-        def __init__(self):
-            self.replay_data = kawaii.replay_data["wait_love_re"]
-        def normal(self, customer: dict):
+
+        def reply(self, customer: dict):
             """
-            不爱我嘛！
+            爱我嘛？
+            """
+            msg = lika.replay(customer, self.replay_data["reply"])
+            return msg
+
+        def difficult_reply(self, customer: dict):
+            """
+            爱我嘛？（闹别扭）
             """
             pt = customer["lika"]
             if pt > 0:
-                customer["lika"] -= 1
-                customer["love"] += 1
+                customer["lika"] -= 2
+                customer["love"] += 2
                 log = "好感度+1"
-                kawaii.save.customer_data()
+                lika.save.customer_data()
             else:
                 log = ""
 
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["difficult_reply"])
             if log:
                 msg = msg + f"（{log}）"
 
@@ -462,56 +635,63 @@ class Manager:
 
     class ask_selfname():
         def __init__(self):
-            self.replay_data = kawaii.replay_data["ask_selfname"]
+            self.replay_data = lika.replay_data["ask_selfname"]
+
         def normal(self, customer: dict):
             """
             你叫什么名字！
             """
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["normal"])
             return msg
+
         def repeat(self, customer: dict):
             """
             你叫什么名字！重复
             """
-            msg = kawaii.replay(customer, self.replay_data["repeat"])
+            msg = lika.replay(customer, self.replay_data["repeat"])
             return msg
+
         def new(self, customer: dict):
             """
             你叫什么名字！新名字
             """
-            msg = kawaii.replay(customer, self.replay_data["new"])
+            msg = lika.replay(customer, self.replay_data["new"])
             return msg
 
     class ask_customername():
         def __init__(self):
-            self.replay_data = kawaii.replay_data["ask_customername"]
+            self.replay_data = lika.replay_data["ask_customername"]
+
         def normal(self, customer: dict):
             """
             我叫什么名字！
             """
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["normal"])
             return msg
+
         def repeat(self, customer: dict):
             """
             我叫什么名字！重复
             """
-            msg = kawaii.replay(customer, self.replay_data["repeat"])
+            msg = lika.replay(customer, self.replay_data["repeat"])
             return msg
+
         def new(self, customer: dict):
             """
             我叫什么名字！新名字
             """
-            msg = kawaii.replay(customer, self.replay_data["new"])
+            msg = lika.replay(customer, self.replay_data["new"])
             return msg
 
     class set_selfname():
         def __init__(self):
-            self.replay_data = kawaii.replay_data["set_selfname"]
+            self.replay_data = lika.replay_data["set_selfname"]
+
         def save(self, customer: dict, data: dict) -> bool:
             msg = param(data,"set_selfname",{"y"})
             if msg:
                 customer["nickname"] = msg
-                kawaii.save.customer_data()
+                lika.save.customer_data()
                 return True
             else:
                 return False
@@ -521,70 +701,133 @@ class Manager:
             就叫你小叶子吧！
             """
             self.save(customer, data)
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["normal"])
             return msg
+
         def repeat(self, customer: dict, data: dict):
             """
             就叫你小叶子吧！重复
             """
             self.save(customer, data)
-            msg = kawaii.replay(customer, self.replay_data["repeat"])
+            msg = lika.replay(customer, self.replay_data["repeat"])
             return msg
 
     class set_customername():
         def __init__(self):
-            self.replay_data = kawaii.replay_data["set_customername"]
+            self.replay_data = lika.replay_data["set_customername"]
+
         def save(self, customer: dict, data: dict):
             msg = param(data,"set_customername",{"y"})
             if msg:
                 customer["customer"]["nickname"] = msg
-                kawaii.save.customer_data()
+                lika.save.customer_data()
                 return True
             else:
                 return False
+
         def normal(self, customer: dict, data: dict):
             """
             以后要叫我主人哦！
             """
             self.save(customer, data)
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["normal"])
             return msg
+
         def repeat(self, customer: dict, data: dict):
             """
             以后要叫我主人哦！重复
             """
             self.save(customer, data)
-            msg = kawaii.replay(customer, self.replay_data["repeat"])
+            msg = lika.replay(customer, self.replay_data["repeat"])
             return msg
+
+    class memory():
+        def __init__(self):
+            self.replay_data = lika.replay_data["memory"]
+
+        def set_selfis(self, customer: dict, data: dict):
+            """
+            你是我老婆。
+            """
+            customer["title"] = param(data["param"].get("set_selfis"))
+            msg = lika.replay(customer, self.replay_data["set_selfis"])
+            return msg
+
+        def whatis_self(self, customer: dict, data: dict):
+            """
+            你是什么人？
+            """
+            TITLE = customer["title"]
+            if title:
+                msg = lika.replay(customer, self.replay_data["whatis_self"])
+            else:
+                msg = lika.replay(customer, self.replay_data["unknow"])
+
+            return msg.replace("TITLE",TITLE)
+
+        def set_customeris(self, customer: dict, data: dict):
+            """
+            我是你的老公！
+            """
+            customer["customer"]["title"] = param(data["param"].get("set_customeris")) 
+            msg = lika.replay(customer, self.replay_data["set_customeris"])
+            return msg
+
+        def whatis_customer(self, customer: dict, data: dict):
+            """
+            我是什么人
+            """
+            TITLE = customer["title"]
+            if title:
+                msg = lika.replay(customer, self.replay_data["whatis_customer"])
+            else:
+                msg = lika.replay(customer, self.replay_data["unknow"])
+
+            return msg.replace("TITLE",TITLE)
+
+        def set_otheris(self, customer: dict, data: dict):
+            """
+            枫枫是机器人。
+            """
+            key = param(data,data["param"].get("set_otheris")[0][1])
+            value = param(data,"set_otheris")
+            customer["memory"].update({key:value})
+            lika.save.customer_data()
+            NAME1 = customer["nickname"] or Bot_NICKNAME
+            NAME2 = lika.nickname(customer)
+            return f"{key}是{value}".replace("NAME1", NAME1).replace("NAME2", NAME2)
+
+        def whatis_other(self, customer: dict, data: dict):
+            """
+            枫枫是谁。
+            """
+            key = param(data,data["param"].get("whatis_other")[0][1]) or param(data,"whatis_other")
+            value = customer["memory"].get(key)
+            if value:
+                NAME1 = customer["nickname"] or Bot_NICKNAME
+                NAME2 = lika.nickname(customer)
+                return f"{key}是{value}".replace("NAME1", NAME1).replace("NAME2", NAME2)
+            else:
+                return f"{Bot_NICKNAME}不知道哦。"
 
     class hello1():
         def __init__(self):
-            self.replay_data = kawaii.replay_data["hello"]
+            self.replay_data = lika.replay_data["hello"]
         def normal(self, customer: dict):
             """
             你好！
             """
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["normal"])
             return msg
 
     class hello1():
         def __init__(self):
-            self.replay_data = kawaii.replay_data["hello"]
+            self.replay_data = lika.replay_data["hello"]
         def normal(self, customer: dict):
             """
             你好！
             """
-            msg = kawaii.replay(customer, self.replay_data["normal"])
+            msg = lika.replay(customer, self.replay_data["normal"])
             return msg
 
-    class hello1():
-        def __init__(self):
-            self.replay_data = kawaii.replay_data["hello"]
-        def normal(self, customer: dict):
-            """
-            你好！
-            """
-            msg = kawaii.replay(customer, self.replay_data["normal"])
-            return msg
-
-kawaii = Manager()
+lika = Manager()
