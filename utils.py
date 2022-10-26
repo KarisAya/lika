@@ -43,6 +43,7 @@ def analys_text(msg:str) -> list:
             elif seg == "是":
                 event_list.append(["is",seg])
                 event_list.append(["name","",0])
+                event_list.append(["done",""])
             elif seg == "不想":
                 event_list.append(["not",seg])
             else:
