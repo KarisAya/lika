@@ -1,13 +1,4 @@
 from pathlib import Path
-from nonebot.adapters.onebot.v11 import (
-    Bot,
-    Event,
-    MessageEvent,
-    GroupMessageEvent,
-    PrivateMessageEvent,
-    Message,
-    MessageSegment
-    )
 import os
 import re
 
@@ -23,7 +14,6 @@ def analys_text(msg:str) -> list:
     分析句子
     """
     event_list = [["event","start"]]
-    i = 1
     for seg, flag in pseg.cut(msg, use_paddle = True):
         if seg == "你":
             event_list.append(["name",seg, 1])
@@ -33,10 +23,10 @@ def analys_text(msg:str) -> list:
             event_list.append(["replay",seg])
         elif flag == "l":
             if seg == "我爱你":
-                event_list.insert(i,["event","love"])
+                event_list.append(["event","love"])
                 event_list.append(["done",seg])
             elif "好" in seg:
-                event_list.insert(i,["event","hello"])
+                event_list.append(["event","hello"])
                 event_list.append(["hello",seg])
             else:
                 event_list.append(["other",seg,flag])
@@ -73,11 +63,11 @@ def analys_text(msg:str) -> list:
             else:
                 event_list.append(["other",seg,flag])
         elif flag == "x":
-            event_list.insert(i,["event","cut"])
+            event_list.append(["event","cut"])
             event_list.append(["done",seg])
         elif flag == "y":
             if seg in ["吗","嘛"]:
-                event_list.insert(i,["event","ask"])
+                event_list.append(["event","ask"])
                 event_list.append(["done",seg])
             else:
                 event_list.append(["y",seg])
@@ -90,7 +80,6 @@ def analys_text(msg:str) -> list:
                 event_list.append(["ignore",seg])
         else:
             event_list.append(["other",seg,flag])
-        i += 1
     else:
         return event_list
 
@@ -98,30 +87,24 @@ def analys_list(event_list:list) -> list:
     """
     分析事件列表
     """
-    N = len(event_list)
-    i = 0
-    j = 1
     new_list = []
     event = []
-    flag = 0
-    while i < N:
-        seg = event_list[i]
-        new_list.append(seg)
-        i += 1
-        if seg[0] in {"name","what","who","not","do"} | do_set:
+    for seg in event_list:
+        if seg[0] in {"name","what","who","not"}:
+            event.append(seg)
+        elif seg[0] in {"do"} | do_set:
             event.append(seg)
         elif seg[0] in {"ignore", "y"}:
-            j += 1
-            continue
+            pass
         else:
             if len(event) > 1:
-                new_list.insert(i-j, event_tag(event))
+                new_list.append(event_tag(event))
             event = []
-        j = 1
+        new_list.append(seg)
     else:
         if len(event) > 1:
-            new_list.insert(i, event_tag(event))
-
+            new_list.append(event_tag(event))
+            
     return new_list
 
 def A_B_do_ask(event_list:list):
@@ -147,10 +130,10 @@ def A_B_do_ask(event_list:list):
                 do = seg[0] if seg[0] != "do" else ("do_" + seg[1])
                 seg[0] = "done"
                 tmp = seg
-            if do == "not":
+            elif do == "not":
                 do = "not_" + seg[0] if seg[0] != "do" else ("do_" + seg[1])
                 seg[0] = "done"
-            elif do[:2] == "do":
+            elif do.startswith("do_"):
                 tmp[0] = "event"
                 tmp[1] = "wait"
                 do = seg[0] if seg[0] != "do" else ("do_" + seg[1])
@@ -164,6 +147,7 @@ def A_B_do_ask(event_list:list):
         pass
 
     return A, B, do, ask
+
 def event_tag(event_list:list) -> list:
     """
     生成：event_tag
@@ -232,7 +216,7 @@ def event_tag(event_list:list) -> list:
             return ["event","set_customerlove"]
         else:
             return ["event","love_do"]
-    elif "not_" in do:
+    elif do.startswith("not_"):
         if do == "not_like":
             if not ask and B == 1:
                 return ["event","not_like"]
@@ -275,45 +259,29 @@ def analys_event(event_list:list) -> dict:
     tag = []
     for seg in event_list:
         if seg[0] == "event":
-            if seg[1] == "cut":
-                flag = 0
+            key = seg[1]
+            if key in analys["param"]:
+                extra = 0
+                tmp = key
+                while tmp in analys["param"]:
+                    tmp = key + f"_extra_{extra}"
+                    extra += 1
+                else:
+                    key = tmp
+            tag.append(key)
+            analys["param"][key] = []
+            if len(tag) > 1:
+                analys["param"][key].append(["before",tag[-2]])
+                if key.startswith("learn"):
+                    analys["param"][tag[-2]].insert(0,["info",seg[2]])
+                    analys["param"][key].append(["info",seg[3]])
+                elif key.startswith("question"):
+                    analys["param"][key].append(["info",seg[2]])
+        else:
+            if seg[0] == "done":
                 continue
             else:
-                tag.append(seg[1])
-                key = tag[-1]
-                if not analys["param"].setdefault(key,[]):
-                    if len(tag) > 1:
-                        analys["param"][key].append(["before",tag[-2]])
-                        if key == "learn":
-                            analys["param"][tag[-2]].insert(0,["info",seg[2]])
-                            analys["param"][key].append(["info",seg[3]])
-                        elif key == "question":
-                            analys["param"][key].append(["info",seg[2]])
-                    flag = 1
-                else:
-                    flag = 0
-        elif seg[0] == "done":
-            continue
-        else:
-            key = tag[-1]
-            if flag == 0:
-                if not analys["param"].get(key):
-                    analys["param"].setdefault(key,[])
-                    if len(tag) > 1:
-                        analys["param"][key].append(["before",tag[-2]])
-                    analys["param"][key].append(seg)
-                    flag = 1
-                else:
-                    analys["param"].setdefault(key + "_extra",[])
-                    if len(tag) > 1:
-                        analys["param"][key + "_extra"].append(["before",tag[-2]])
-                    analys["param"][key + "_extra"].append(seg)
-                    flag = 2
-            elif flag == 1:
-                analys["param"][key].append(seg)
-            elif flag == 2:
-                analys["param"][key + "_extra"].append(seg)
-
+                analys["param"][tag[-1]].append(seg)
     else:
         tag = tag[1:]
         if len(tag) == 1:
@@ -335,60 +303,50 @@ def analys_event(event_list:list) -> dict:
                 elif "ask_like" in tag:
                     analys["tag"] = "ask_like"
                 else:
-                    analys["tag"] = tag_format(tag)
+                    analys["tag"] = tag_format(tag)[0]
             elif "wait" in tag:
                 if "love" in tag:
                     analys["tag"] = "wait_love"
                 elif "like" in tag:
                     analys["tag"] = "wait_like"
                 else:
-                    analys["tag"] = tag_format(tag)
+                    analys["tag"] = tag_format(tag)[0]
             else:
-                analys["tag"] = tag_format(tag)
+                analys["tag"] = tag_format(tag)[0]
         else:
             pass
     return analys
 
-def tag_format(tag:list) -> str:
-    output = set(tag) - {"ask","wait"}
-    if output:
-        return list(output)[0]
-    else:
-        return None
+def tag_format(tag:list) -> list:
+    output = []
+    for x in tag:
+        if x in ["start","cut","ask","wait"] or x.startswith("cut"):
+            pass
+        else:
+            output.append(x)
+    return output
+
+
 
 def analys(msg:str) -> dict:
     if (not msg) or msg.isspace():
         return {"tag":"hello","param":[]}
     return analys_event(analys_list(analys_text(msg)))
 
-def analys_param(data: dict, key: str, ignore: set = set()):
-    """
-    分析参数
-    """
-    tag = None
-    before = None
-    tag = data["param"].get(key)
-    if tag:
-        tag, before = analys_seg(tag,ignore)
-        if before:
-            before = data["param"].get(before)
-            if before:
-                before = analys_seg(before,ignore)
-
-    return tag, before
-
 def analys_seg(seg_list:list ,ignore: set = set()) -> dict:
     """
     分析片段。
     """
     ignore = {"done"} | ignore
-    tag = []
+    tag = ""
     before = None
     for seg in seg_list:
         if seg[0] in ignore:
             continue
+        elif seg[1] == "NAME0":
+            continue
         elif seg[0] == "before":
             before = seg[1]
         else:
-            tag.append(seg)
+            tag += seg[1]
     return tag, before
