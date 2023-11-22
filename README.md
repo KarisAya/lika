@@ -92,7 +92,8 @@ root.mount("./src", True)
 True: html
     bool,访问文件夹路径是否视为访问文件夹下index.html文件
 """
-```bash
+```
+
 在根目录添加你在本地`./src`目录的资源
 
 假设这是你的文件结构
