@@ -4,7 +4,7 @@ _✨简易 Python ASGI Web框架 ✨_
 <img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="python">
 <a href="./LICENSE"><img src="https://img.shields.io/github/license/KarisAya/lika.svg" alt="license"></a>
 
-# 安装
+# 💿安装
 
 使用 pip 安装已发布的最新版本
 
@@ -18,7 +18,7 @@ git clone https://github.com/KarisAya/lika.git
 ```
 或者选择任意你喜欢的方式
 
-# 使用
+# 🎉使用
 
 ## 使用 uvicorn 运行服务
 
