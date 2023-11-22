@@ -156,13 +156,12 @@ test 实际上也是服务器路径 "/test" 的路由图
 
 ```python
 import uvicorn
-from lika.server import Server,RouterMap
+from lika.server import Server, RouterMap
 from lika.response import Response
 
-# 创建一个路由图
-router_map = RouterMap()
-# 向路由图里面添加本地资源
-router_map.mount("./src", True)
+router_map = RouterMap()  # 创建一个路由图
+router_map.mount("./src", True)  # 向路由图里面添加本地资源
+
 # 向路由图里面添加响应
 @router_map.router("/test")
 async def _(scope, receive):
@@ -171,22 +170,19 @@ async def _(scope, receive):
 
 # 使用路由图的子路由图
 hello = router_map.set_map("/hello")
+
 @hello.router("/world")
 async def _(scope, receive):
     # Do ...
     return Response(200, [(b"Content-type", b"text/plain")], [b"hello world"])
 
-# 创建一个新的路由图
-new_rtmp = RouterMap()
-
-# 把整个router_map放new_rtmp的/index/目录下
-new_rtmp.set_map("/index",router_map)
+new_rtmp = RouterMap()  # 创建一个新的路由图
+new_rtmp.set_map("/index", router_map)  # 把整个router_map放new_rtmp的/index/目录下
 
 if __name__ == "__main__":
     server = Server()
-    # 把整个new_rtmp放进服务器根路由图的/index/目录下
-    server.router_map.set_map("/index"，new_rtmp)
-    print(server.router_map) # 了解一下发生了什么（
+    server.router_map.set_map("/index", new_rtmp)  # 把整个new_rtmp放进服务器根路由图的/index/目录下
+    print(server.router_map)  # 了解一下发生了什么（
     uvicorn.run(server, host="127.0.0.1", port=8080)
 ```
 
