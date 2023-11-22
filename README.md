@@ -1,24 +1,27 @@
 # lika
-_✨简易 Python ASGI Web框架 ✨_
+
+_✨ 简易 Python ASGI Web 框架 ✨_
 
 <img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="python">
 <a href="./LICENSE"><img src="https://img.shields.io/github/license/KarisAya/lika.svg" alt="license"></a>
 
-# 💿安装
+# 💿 安装
 
 使用 pip 安装已发布的最新版本
 
 ```bash
 pip install lika
 ```
+
 可以克隆 Git 仓库后手动安装
 
 ```bash
 git clone https://github.com/KarisAya/lika.git
 ```
+
 或者选择任意你喜欢的方式
 
-# 🎉使用
+# 🎉 使用
 
 ## 使用 uvicorn 运行服务
 
@@ -34,7 +37,7 @@ if __name__ == "__main__":
 
 ## 添加路由
 
-当然你的web服务器里面要有内容
+当然你的 web 服务器里面要有内容
 下面是一个示例。添加一个路由返回随机图。
 
 ```python
@@ -82,6 +85,7 @@ hello = root.get_map("/hello") # 如果在@root.router之前执行这行代码�
 ## 使用本地资源
 
 你可以添加一些资源
+
 ```python
 root.mount("./src", True)
 
@@ -111,6 +115,7 @@ True: html
         bundle.js
         index.html
 ```
+
 访问 `/image/07c438ee01fc3bbeb21a116f2ad1e440.png` 你将会看到这张图片。
 
 （即便你已经把 `/image/` 做成了随机图。）
@@ -128,7 +133,7 @@ ps:
 形如"{id}"的地址占位符
 
 ```python
-@root.router("/test/{code}/{other}") 
+@root.router("/test/{code}/{other}")
 async def _(scope, receive, code:str, other:str):
     return Response(
         int(code),
@@ -136,6 +141,7 @@ async def _(scope, receive, code:str, other:str):
         [other.encode()],
         )
 ```
+
 现在你可以正常访问 `/test/418/hello` 或者 `/test/200/world`
 
 请不要访问`/test/hello/world`，因为你不能 `int("hello")`
@@ -152,11 +158,12 @@ root 实际上是服务器根路径 "/" 的路由图（RouterMap）
 
 test 实际上也是服务器路径 "/test" 的路由图
 
-路由图（RouterMap）并不依托于服务器，你也可以先有RouterMap，再把RouterMap添加到服务器上
+路由图（RouterMap）并不依托于服务器，你也可以先有 RouterMap，再把 RouterMap 添加到服务器上
 
 ```python
 import uvicorn
-from lika.server import Server, RouterMap
+from lika.server import Server
+from lika.router import RouterMap
 from lika.response import Response
 
 router_map = RouterMap()  # 创建一个路由图
@@ -186,10 +193,6 @@ if __name__ == "__main__":
     uvicorn.run(server, host="127.0.0.1", port=8080)
 ```
 
-
-
 # 📖 介绍
-
-
 
 # 📝 更新日志
