@@ -23,6 +23,7 @@ git clone https://github.com/KarisAya/lika.git
 ## 使用 uvicorn 运行服务
 
 ```python
+import uvicorn
 from lika.server import Server
 if __name__ == "__main__":
     server = Server()
@@ -31,12 +32,13 @@ if __name__ == "__main__":
 
 这样你就已经运行了一个 Web 服务器
 
-## 添加路径
+## 添加路由
 
 当然你的web服务器里面要有内容
 下面是一个示例。添加一个路由返回随机图。
 
 ```python
+import uvicorn
 from pathlib import Path
 from lika.server import Server
 from lika.response import Response, Headers
@@ -44,7 +46,7 @@ from lika.response import Response, Headers
 server = Server()
 root = server.router_map
 
-# root是你的web服务器根目录地址图
+# root是你的web服务器根目录路由图
 
 image_src=list(Path("./src/image").iterdir())
 @root.router("/image")
@@ -136,7 +138,56 @@ async def _(scope, receive, code:str, other:str):
 
 请不要访问`/test/hello/world`，因为你不能 `int("hello")`
 
-## 添加
+## 路由图
+
+```python
+server = Server()
+root = server.router_map
+# root 实际上是服务器根路径 "/" 的路由图（RouterMap）
+
+test = root.set_map("/test")
+# test 实际上也是服务器路径 "/test" 的路由图
+```
+
+路由图（RouterMap）并不依托于服务器，你也可以先有RouterMap，再把RouterMap添加到服务器上
+
+```python
+import uvicorn
+from lika.server import Server,RouterMap
+from lika.response import Response
+
+# 创建一个路由图
+router_map = RouterMap()
+# 向路由图里面添加本地资源
+router_map.mount("./src", True)
+# 向路由图里面添加响应
+@router_map.router("/test")
+async def _(scope, receive):
+    # Do ...
+    return Response(200, [(b"Content-type", b"text/plain")], [b"hello world"])
+
+# 使用路由图的子路由图
+hello = router_map.set_map("/hello")
+@hello.router("/world")
+async def _(scope, receive):
+    # Do ...
+    return Response(200, [(b"Content-type", b"text/plain")], [b"hello world"])
+
+# 创建一个新的路由图
+new_rtmp = RouterMap()
+
+# 把整个router_map放new_rtmp的/index/目录下
+new_rtmp.set_map("/index",router_map)
+
+if __name__ == "__main__":
+    server = Server()
+    # 把整个new_rtmp放进服务器根路由图的/index/目录下
+    server.router_map.set_map("/index"，new_rtmp)
+    print(server.router_map) # 了解一下发生了什么（
+    uvicorn.run(server, host="127.0.0.1", port=8080)
+```
+
+
 
 # 📖 介绍
 
