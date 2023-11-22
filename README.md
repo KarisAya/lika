@@ -1,4 +1,4 @@
-# Lika
+# lika
 _✨简易 Python ASGI Web框架 ✨_
 
 <img src="https://img.shields.io/badge/python-3.12+-blue.svg" alt="python">
@@ -31,7 +31,7 @@ if __name__ == "__main__":
 
 这样你就已经运行了一个 Web 服务器
 
-## 开始使用
+## 添加路径
 
 当然你的web服务器里面要有内容
 下面是一个示例。添加一个路由返回随机图。
@@ -44,7 +44,7 @@ from lika.response import Response, Headers
 server = Server()
 root = server.router_map
 
-# root是你的web服务器根目录
+# root是你的web服务器根目录地址图
 
 image_src=list(Path("./src/image").iterdir())
 @root.router("/image")
@@ -77,16 +77,20 @@ async def _(scope, receive):
 hello = root.get_map("/hello") # 如果在@root.router之前执行这行代码会导致 hello == None
 ```
 
-## router_map.mount(src_path,html)
-
-src_path:本地资源路径
-
-html:bool，访问文件夹路径视为访问文件夹下index.html文件
+## 使用本地资源
 
 你可以添加一些资源
 ```python
 root.mount("./src", True)
-```
+
+"""
+"./src":src_path
+    Path,本地资源路径
+
+True: html
+    bool,访问文件夹路径是否视为访问文件夹下index.html文件
+"""
+```bash
 在根目录添加你在本地`./src`目录的资源
 
 假设这是你的文件结构
@@ -103,19 +107,36 @@ root.mount("./src", True)
         bundle.js
         index.html
 ```
-那么访问 http://127.0.0.1:8080/image/07c438ee01fc3bbeb21a116f2ad1e440.png
+访问 `/image/07c438ee01fc3bbeb21a116f2ad1e440.png` 你将会看到这张图片。
 
-你将会看到这张图片
+（即便你已经把 `/image/` 做成了随机图。）
 
-_ps:_
+ps:
 
-_访问 http://127.0.0.1:8080/index/_
+访问 `http://127.0.0.1:8080/index/`
 
-_你将会看到 /index/index.html_
+你将会看到 `/index/index.html`
 
-_除非你用 root.mount("./src", False)_
+除非你用 `root.mount("./src", False)`
 
+## 地址占位符
 
+形如"{id}"的地址占位符
+
+```python
+@root.router("/test/{code}/{other}") 
+async def _(scope, receive, code:str, other:str):
+    return Response(
+        int(code),
+        [(b"Content-type", b"text/plain")],
+        [other.encode()],
+        )
+```
+现在你可以正常访问 `/test/418/hello` 或者 `/test/200/world`
+
+请不要访问`/test/hello/world`，因为你不能 `int("hello")`
+
+## 添加
 
 # 📖 介绍
 
