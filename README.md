@@ -34,14 +34,55 @@ if __name__ == "__main__":
 ## 开始使用
 
 当然你的web服务器里面要有内容
+下面是一个示例。添加一个路由返回随机图。
 
 ```python
+from pathlib import Path
+from lika.server import Server
+from lika.response import Response, Headers
+
 server = Server()
 root = server.router_map
-```
-root是你的web服务器根目录
 
-## router_map.mount
+# root是你的web服务器根目录
+
+image_src=list(Path("./src/image").iterdir())
+@root.router("/image")
+async def _(scope, receive):
+    image = random.choice(image_src)
+    with open(image, "rb") as f:
+        return Response(200, Headers.from_ext(image.suffix), [f.read()])
+
+# /重定向到/image
+root.redirect(301, "/", "/image/")
+```
+
+## 使用子目录
+
+```python
+# 添加子目录
+hello = root.set_map("/hello")
+@hello.router("/world")
+async def _(scope, receive):
+    return Response(200, [(b"Content-type", b"text/plain")], [b"hello world"])
+```
+
+等效于
+
+```python
+@root.router("/hello/world")
+async def _(scope, receive):
+    return Response(200, [(b"Content-type", b"text/plain")], [b"hello world"])
+
+hello = root.get_map("/hello") # 如果在@root.router之前执行这行代码会导致 hello == None
+```
+
+## router_map.mount(src_path,html)
+
+src_path:本地资源路径
+
+html:bool，访问文件夹路径视为访问文件夹下index.html文件
+
 你可以添加一些资源
 ```python
 root.mount("./src", True)
@@ -66,15 +107,13 @@ root.mount("./src", True)
 
 你将会看到这张图片
 
-_ps:
+_ps:_
 
-访问 http://127.0.0.1:8080/index/
+_访问 http://127.0.0.1:8080/index/_
 
-你将会看到 /index/index.html
+_你将会看到 /index/index.html_
 
-除非你用 root.mount("./src", False) 
-
-这样添加的本地资源不会使文件夹对应文件夹下的index.html_
+_除非你用 root.mount("./src", False)_
 
 
 
