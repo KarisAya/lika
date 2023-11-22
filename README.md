@@ -145,11 +145,12 @@ async def _(scope, receive, code:str, other:str):
 ```python
 server = Server()
 root = server.router_map
-# root 实际上是服务器根路径 "/" 的路由图（RouterMap）
-
 test = root.set_map("/test")
-# test 实际上也是服务器路径 "/test" 的路由图
 ```
+
+root 实际上是服务器根路径 "/" 的路由图（RouterMap）
+
+test 实际上也是服务器路径 "/test" 的路由图
 
 路由图（RouterMap）并不依托于服务器，你也可以先有RouterMap，再把RouterMap添加到服务器上
 
