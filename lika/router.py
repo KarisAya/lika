@@ -53,10 +53,7 @@ class RouterMap(Dict[str, "RouterMap"]):
         """
         执行 ASGI 发送方法
         """
-        if self.app:
-            response = await self.app(scope, receive, **kwargs)
-        else:
-            response = self.response
+        response = self.response or await self.app(scope, receive, **kwargs)
         await send(response.start)
         for body in response.bodys:
             await send(body)
@@ -98,54 +95,64 @@ class RouterMap(Dict[str, "RouterMap"]):
                 others.update(kwargs)
                 return await func(scope, receive, **others)
 
+            router_map.response = None
             router_map.app = warpper
 
         return decorator
 
     def redirect(self, code: int, path: RouterPath, redirect_to: str):
         router_map = self.set_map(path)
-        router_map.app = None
         router_map.response = Response(code, [(b"Location", redirect_to.encode())])
 
-    def mount(self, src_path: Path, html: bool = False):
+    def directory(
+        self,
+        src_path: Path,
+        html: bool = False,
+        for_router: set = {},
+        for_response: set = {".html", ".js", ".txt", ".json"},
+    ):
         src_path = Path(src_path)
         for src_sp in src_path.iterdir():
             k = RouterPath(src_sp)[-1]
             router_map = self[k] = RouterMap(src_sp.is_file())
             if not router_map.is_file:
-                router_map.mount(src_sp, html)
+                router_map.directory(src_sp, html)
                 continue
+            router_map.file(src_path, for_router, for_response)
+            if html and src_sp.name == "index.html":
+                self.app = router_map.app
+                self.response = router_map.response
 
-            @router_map.router(src_path=src_sp)
-            async def _(scope, receive, src_path: Path):
-                with open(src_path, "rb") as f:
-                    response = Response(
-                        code=200,
-                        headers=Headers.from_ext(src_path.suffix),
-                        bodys=[f.read()],
-                    )
+    def file(self, src_path: Path, for_router: set, for_response: set):
+        if for_router:
+            if src_path.suffix in for_router:
+                self.file_for_router(src_path)
+            else:
+                self.file_for_response(src_path)
+        elif for_response:
+            if src_path.suffix in for_response:
+                self.file_for_response(src_path)
+            else:
+                self.file_for_router(src_path)
+        else:
+            self.file_for_router(src_path)
+
+    def file_for_router(self, src_path: Path):
+        @self.router()
+        async def _(scope, receive):
+            with open(src_path, "rb") as f:
+                response = Response(
+                    code=200,
+                    headers=Headers.from_ext(src_path.suffix),
+                    bodys=[f.read()],
+                )
                 return response
 
-            if html and src_sp.name == "index.html":
-                self.app = self[k].app
-
-    def mount_in_memory(self, src_path: Path, html: bool = False):
-        src_path = Path(src_path)
-        for src_sp in src_path.iterdir():
-            k = RouterPath(src_sp)[-1]
-            if src_sp.is_dir():
-                self[k] = RouterMap()
-                self[k].mount(src_sp, html)
-            else:
-                self[k] = RouterMap(is_file=True)
-                with open(src_sp, "rb") as f:
-                    response = Response(
-                        code=200,
-                        headers=Headers.from_ext(src_sp.suffix),
-                        bodys=[f.read()],
-                    )
-
-                self[k].response = response
-
-                if html and src_sp.name == "index.html":
-                    self.response = self[k].response
+    def file_for_response(self, src_path: Path):
+        with open(src_path, "rb") as f:
+            response = Response(
+                code=200,
+                headers=Headers.from_ext(src_path.suffix),
+                bodys=[f.read()],
+            )
+        self.response = response

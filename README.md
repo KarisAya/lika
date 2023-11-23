@@ -84,20 +84,21 @@ hello = root.get_map("/hello") # 如果在@root.router之前执行这行代码�
 
 ## 使用本地资源
 
-你可以添加一些资源
+你可以添加一些本地资源
 
 ```python
-root.mount("./src", True)
-
-"""
-"./src":src_path
-    Path,本地资源路径
-
-True: html
-    bool,访问文件夹路径是否视为访问文件夹下index.html文件
-"""
-
+root.directory("./src", True)
 ```
+
+`src_path` Path,本地资源路径
+
+`html` bool,访问文件夹路径是否视为访问文件夹下 index.html 文件
+
+`for_router` set,此内扩展名的文件在每次访问时读取，其他文件放进内存
+
+`for_response` set,此内扩展名的文件存放进内存，其他在每次访问时读取
+
+`for_router`与`for_response`二选一
 
 在根目录添加你在本地`./src`目录的资源
 
@@ -167,7 +168,7 @@ from lika.router import RouterMap
 from lika.response import Response
 
 router_map = RouterMap()  # 创建一个路由图
-router_map.mount("./src", True)  # 向路由图里面添加本地资源
+router_map.directory("./src", True)  # 向路由图里面添加本地资源
 
 # 向路由图里面添加响应
 @router_map.router("/test")
