@@ -1,12 +1,8 @@
-from typing import Literal
 from .router import RouterPath, RouterMap
 
 
-Env = Literal["dev", "test", "prod"]
-
-
 class Server:
-    def __init__(self, env: Env = "dev"):
+    def __init__(self):
         self.router_map = RouterMap()
         self.error = RouterMap()
         for i in range(400, 419):
