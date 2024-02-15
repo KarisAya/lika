@@ -41,11 +41,11 @@ class RouterMap(Dict[str, "RouterMap"]):
 
     def __init__(
         self,
-        is_file: bool = False,
+        is_dir: bool = True,
         response: Response = Response(404),
     ):
         super().__init__()
-        self.is_file = is_file
+        self.is_dir = is_dir
         self.response = response
         self.kwargs = {}
 
@@ -114,8 +114,8 @@ class RouterMap(Dict[str, "RouterMap"]):
         src_path = Path(src_path)
         for src_sp in src_path.iterdir():
             k = RouterPath(src_sp)[-1]
-            router_map = self[k] = RouterMap(src_sp.is_file())
-            if not router_map.is_file:
+            router_map = self[k] = RouterMap(src_sp.is_dir())
+            if router_map.is_dir:
                 router_map.directory(src_sp, html)
                 continue
             router_map.file(src_path, for_router, for_response)

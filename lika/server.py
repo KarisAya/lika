@@ -3,8 +3,8 @@ from .router import RouterPath, RouterMap
 
 class Server:
     def __init__(self):
-        self.router_map = RouterMap()
-        self.error = RouterMap()
+        self.router_map: RouterMap = RouterMap()
+        self.error: RouterMap = RouterMap()
         for i in range(400, 419):
             self.error[str(i)] = RouterMap()
 
