@@ -26,20 +26,21 @@ class Response:
             "headers": headers,
         }
 
-    # def from_ext(ext: str) -> Headers:
-    #     match ext.lstrip("."):
-    #         case "html":
-    #             return [(b"Content-type", b"text/html")]
-    #         case "js":
-    #             return [(b"Content-type", b"application/javascript")]
-    #         case "txt" | "json":
-    #             return [(b"Content-type", b"text/plain")]
-    #         case "jpg" | "png" | "jpeg" | "gif" | "webp":
-    #             return [(b"Content-type", f"image/{ext}".encode())]
-    #         case "mp4" | "avi" | "mkv" | "webm":
-    #             return [(b"Content-type", f"video/{ext}".encode())]
-    #         case _:
-    #             return [
-    #                 (b"Content-type", b"application/octet-stream"),
-    #                 (b"Content-disposition", b"attachment"),
-    #             ]
+    @staticmethod
+    def content_type(ext: str) -> Headers:
+        match ext.lstrip("."):
+            case "html":
+                return [(b"Content-type", b"text/html")]
+            case "js":
+                return [(b"Content-type", b"application/javascript")]
+            case "txt" | "json":
+                return [(b"Content-type", b"text/plain")]
+            case "jpg" | "png" | "jpeg" | "gif" | "webp":
+                return [(b"Content-type", f"image/{ext}".encode())]
+            case "mp4" | "avi" | "mkv" | "webm":
+                return [(b"Content-type", f"video/{ext}".encode())]
+            case _:
+                return [
+                    (b"Content-type", b"application/octet-stream"),
+                    (b"Content-disposition", b"attachment"),
+                ]

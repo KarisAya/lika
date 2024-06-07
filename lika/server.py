@@ -1,29 +1,26 @@
-from .router import RouterPath, RouterMap
+from .router import RouteMap
 
 
 class Server:
     def __init__(self):
-        self.router_map: RouterMap = RouterMap()
-        self.error: RouterMap = RouterMap()
+        self.route_map: RouteMap = RouteMap()
+        self.error: RouteMap = RouteMap()
         for i in range(400, 419):
-            self.error[str(i)] = RouterMap()
-
-    def get_map(self, path: str) -> RouterMap:
-        router_map = self.router_map
-        kwargs = {}
-        for k in RouterPath(path):
-            if k in router_map:
-                router_map = router_map[k]
-            elif "{id}" in router_map:
-                router_map = router_map["{id}"]
-                kwargs[router_map.keyword] = k
-            else:
-                return self.error["404"], kwargs
-        return router_map, kwargs
+            self.error[str(i)] = RouteMap()
 
     async def __call__(self, scope, receive, send):
-        router_map, kwargs = self.get_map(scope["path"])
-        return await router_map(scope, receive, send, **kwargs)
+        node = self.route_map
+        path: str = scope["path"]
+        kwargs = {}
+        for k in path.split("/"):
+            if k in node:
+                node = node[k]
+            elif node.keyword:
+                node = node["{id}"]
+                kwargs[node.keyword] = k
+            else:
+                node = self.error["404"]
+        return await node(scope, receive, send, **kwargs)
 
 
 # def proxy(self, key: str, url: str):
