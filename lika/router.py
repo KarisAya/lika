@@ -1,12 +1,22 @@
-from typing import Coroutine, Callable, Dict, List
+from collections.abc import Coroutine, Callable, Sequence
 from pathlib import Path
 import urllib.parse
 from .response import Response, Headers
 
 
-class RouterPath(List[str]):
+class RouterPath(list[str]):
     def __init__(self, data):
         super().__init__()
+        match data:
+            case str():
+                self.extend(data.split("/"))
+            case Path():
+                self.extend(data.parts)
+            case Sequence():
+                self.extend(data)
+            case _:
+                raise TypeError(f"{data} is not a valid path")
+
         if isinstance(data, Path):
             result = urllib.parse.quote(str(data.as_posix())).strip("/").split("/")
         elif isinstance(data, str):

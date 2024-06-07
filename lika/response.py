@@ -1,27 +1,5 @@
-from typing import Tuple, List
-
-Bodys = List[bytes]
-
-
-class Headers(List[Tuple[bytes, bytes]]):
-    @staticmethod
-    def from_ext(ext: str) -> "Headers":
-        ext = ext.lstrip(".")
-        if ext in {"html"}:
-            return [(b"Content-type", b"text/html")]
-        elif ext in {"js"}:
-            return [(b"Content-type", b"application/javascript")]
-        elif ext in {"txt", "json"}:
-            return [(b"Content-type", b"text/plain")]
-        elif ext in {"jpg", "png", "jpeg", "gif", "webp"}:
-            return [(b"Content-type", f"image/{ext}".encode())]
-        elif ext in {"mp4", "avi", "mkv", "webm"}:
-            return [(b"Content-type", f"video/{ext}".encode())]
-        else:
-            return [
-                (b"Content-type", b"application/octet-stream"),
-                (b"Content-disposition", b"attachment"),
-            ]
+type Bodys = list[bytes]
+type Headers = list[tuple[bytes, bytes]]
 
 
 class Response:
@@ -40,9 +18,28 @@ class Response:
             for body in bodys
         ]
         self.bodys[-1]["more_body"] = False
-        headers.append((b"Content-Length", str(sum(map(len, bodys)))))
+        str(sum(map(len, bodys)))
+        headers.append((b"Content-Length", str(sum(map(len, bodys))).encode("ascii")))
         self.start = {
             "type": "http.response.start",
             "status": code,
             "headers": headers,
         }
+
+    # def from_ext(ext: str) -> Headers:
+    #     match ext.lstrip("."):
+    #         case "html":
+    #             return [(b"Content-type", b"text/html")]
+    #         case "js":
+    #             return [(b"Content-type", b"application/javascript")]
+    #         case "txt" | "json":
+    #             return [(b"Content-type", b"text/plain")]
+    #         case "jpg" | "png" | "jpeg" | "gif" | "webp":
+    #             return [(b"Content-type", f"image/{ext}".encode())]
+    #         case "mp4" | "avi" | "mkv" | "webm":
+    #             return [(b"Content-type", f"video/{ext}".encode())]
+    #         case _:
+    #             return [
+    #                 (b"Content-type", b"application/octet-stream"),
+    #                 (b"Content-disposition", b"attachment"),
+    #             ]
