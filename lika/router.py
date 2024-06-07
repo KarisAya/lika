@@ -4,6 +4,8 @@ from pathlib import Path
 import urllib.parse
 from .response import Response, Headers
 
+type AvailableRoutePath = str | Path | list[str] | RoutePath
+
 
 class RoutePath(Sequence[str]):
     _data: list[str]
@@ -25,7 +27,7 @@ class RoutePath(Sequence[str]):
     def __iter__(self):
         return iter(self._data)
 
-    def __init__(self, data: str | Path | list[str] | "RoutePath"):
+    def __init__(self, data: AvailableRoutePath):
         if isinstance(data, RoutePath):
             self._data = data._data
             return
@@ -41,13 +43,13 @@ class RoutePath(Sequence[str]):
             raise TypeError(f"{data} is not a valid path")
         self._data = result[1:] if result and result[0] == "" else result
 
-    def __add__(self, other: str | Path | list[str] | "RoutePath"):
+    def __add__(self, other: AvailableRoutePath):
         if isinstance(other, RoutePath):
             return RoutePath(self._data + other._data)
         else:
             return RoutePath(self._data + RoutePath(other)._data)
 
-    def __radd__(self, other: str | Path | list[str] | "RoutePath"):
+    def __radd__(self, other: AvailableRoutePath):
         if isinstance(other, RoutePath):
             return other + self
         else:
@@ -88,6 +90,14 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
     def __contains__(self, key: str) -> bool:
         return key in self._data
 
+    def __repr__(self) -> str:
+        repr = {}
+        repr["response"] = bool(self.response)
+        repr["app"] = bool(self.app)
+        repr["keyword"] = self.keyword
+        repr["map"] = self._data
+        return repr.__repr__()
+
     def __init__(
         self,
         is_dir: bool = True,
@@ -120,12 +130,14 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
             self._data[key] = RouteMap(**kwargs)
         return self._data[key]
 
-    def set_route(self, path: RoutePath, route_map: "RouteMap | None" = None, /, **kwargs) -> "RouteMap":
+    def set_route(self, path: AvailableRoutePath, route_map: "RouteMap | None" = None, /, **kwargs) -> "RouteMap":
         """
         设置路由
             path: 路径: 在设置路径中, 如果路径中包含 {xxx} 则会自动匹配路由
             route_map: 设置此节点子路由，为空则是空路由
         """
+        if not isinstance(path, RoutePath):
+            path = RoutePath(path)
         node = self
         for k in path[:-1]:
             node = node.route_to(k, **kwargs)
@@ -136,7 +148,7 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
             node = node.route_to(k, **kwargs)
         return node
 
-    def router(self, path: RoutePath | str = "/", **kwargs) -> Callable:
+    def router(self, path: AvailableRoutePath = "/", **kwargs):
         if isinstance(path, str):
             node = self
             for x in path.strip("/").split("/"):
@@ -150,16 +162,15 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
         else:
             node = self.set_route(path)
 
-        def decorator(func):
-            async def warpper(scope, receive, **others):
-                others.update(kwargs)
-                return await func(scope, receive, **others)
+        def decorator(func: Callable[..., Coroutine]):
+            async def warpper(scope, receive, **kwargs):
+                return await func(scope, receive, **kwargs)
 
             node.app = warpper
 
         return decorator
 
-    def redirect(self, code: int, path: RoutePath, redirect_to: str):
+    def redirect(self, code: int, path: AvailableRoutePath, redirect_to: str):
         route_map = self.set_route(path)
         route_map.response = Response(code, [(b"Location", redirect_to.encode())])
 

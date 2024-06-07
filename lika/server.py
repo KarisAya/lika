@@ -12,14 +12,16 @@ class Server:
         node = self.route_map
         path: str = scope["path"]
         kwargs = {}
-        for k in path.split("/"):
+        for k in path.strip("/").split("/"):
             if k in node:
                 node = node[k]
-            elif node.keyword:
+            elif "{id}" in node:
                 node = node["{id}"]
+                assert node.keyword is not None
                 kwargs[node.keyword] = k
             else:
                 node = self.error["404"]
+                break
         return await node(scope, receive, send, **kwargs)
 
 
