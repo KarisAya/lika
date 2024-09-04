@@ -1,10 +1,11 @@
 from .router import RouteMap
+from .response import Response
 
 
 class Server:
     def __init__(self):
         self.route_map: RouteMap = RouteMap()
-        self.error: RouteMap = RouteMap()
+        self.error = RouteMap()
         for i in range(400, 419):
             self.error[str(i)] = RouteMap()
 
@@ -13,6 +14,8 @@ class Server:
         path: str = scope["path"]
         kwargs = {}
         for k in path.strip("/").split("/"):
+            if not k:
+                continue
             if k in node:
                 node = node[k]
             elif "{id}" in node:
@@ -20,9 +23,18 @@ class Server:
                 assert node.keyword is not None
                 kwargs[node.keyword] = k
             else:
-                node = self.error["404"]
+                response = await self.error["404"](scope, receive)
                 break
-        return await node(scope, receive, send, **kwargs)
+        else:
+            response = await node(scope, receive, **kwargs)
+            if not response:
+                response = await self.error["404"](scope, receive)
+
+        assert isinstance(response, Response)
+
+        await send(response.start)
+        for body in response.bodys:
+            await send(body)
 
 
 # def proxy(self, key: str, url: str):

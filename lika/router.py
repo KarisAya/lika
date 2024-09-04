@@ -117,7 +117,7 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
         self.keyword = keyword
         self.kwargs = {}
 
-    async def __call__(self, scope, receive, send, **kwargs):
+    async def __call__(self, scope, receive, **kwargs) -> Response | None:
         """
         执行 ASGI 发送方法
         """
@@ -125,9 +125,7 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
             response = self.response or Response(404)
         else:
             response = await self.app(scope, receive, **kwargs)
-        await send(response.start)
-        for body in response.bodys:
-            await send(body)
+        return response
 
     def route_to(self, key: str) -> "RouteMap":
         """
@@ -192,8 +190,7 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
 
         308 Permanent Redirect 永久重定向
         """
-        route_map = self.set_route(path)
-        route_map.response = Response(code, [(b"Location", redirect_to.encode(encoding="utf-8"))])
+        self.set_route(path).response = Response(code, [(b"Location", redirect_to.encode(encoding="utf-8"))])
 
     for_router: set[str] = set()
     for_response: set[str] = {".html", ".js", ".txt", ".json"}
