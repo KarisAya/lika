@@ -7,6 +7,10 @@ from .response import Response
 type AvailableRoutePath = str | Path | list[str] | RoutePath
 
 
+class RoutePathError(Exception):
+    pass
+
+
 class RoutePath(Sequence[str]):
     _data: list[str]
 
@@ -122,15 +126,15 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
         for body in response.bodys:
             await send(body)
 
-    def route_to(self, key: str, /, **kwargs) -> "RouteMap":
+    def route_to(self, key: str) -> "RouteMap":
         """
         获取子路由
         """
         if key not in self._data:
-            self._data[key] = RouteMap(**kwargs)
+            raise RoutePathError(f"'{key}' are not exist in this routemap")
         return self._data[key]
 
-    def set_route(self, path: AvailableRoutePath, route_map: "RouteMap | None" = None, /, **kwargs) -> "RouteMap":
+    def set_route(self, path: AvailableRoutePath, route_map: "RouteMap | None" = None) -> "RouteMap":
         """
         设置路由
             path: 路径: 在设置路径中, 如果路径中包含 {xxx} 则会自动匹配路由
@@ -138,14 +142,13 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
         """
         if not isinstance(path, RoutePath):
             path = RoutePath(path)
-        node = self
-        for k in path[:-1]:
-            node = node.route_to(k, **kwargs)
-        k = path[-1]
-        if route_map:
-            node = node._data[k] = node
-        else:
-            node = node.route_to(k, **kwargs)
+        node: RouteMap = self
+        for key in path[:-1]:
+            if key in node._data:
+                node = node._data[key]
+            else:
+                node = node._data[key] = RouteMap()
+        node = node._data[path[-1]] = route_map or RouteMap()
         return node
 
     def router(self, path: AvailableRoutePath = "/", **kwargs):
@@ -154,25 +157,36 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
             for x in path.strip("/").split("/"):
                 if x.startswith("{") and x.endswith("}"):
                     kwargs["keyword"] = x[1:-1]
-                    k = "{id}"
+                    key = "{id}"
                 else:
-                    k = urllib.parse.quote(x)
-                node = node.route_to(k, **kwargs)
+                    key = urllib.parse.quote(x)
+                if key in node._data:
+                    node = node._data[key]
+                else:
+                    node = node._data[key] = RouteMap()
 
         else:
             node = self.set_route(path)
 
         def decorator(func: Callable[..., Coroutine]):
-            async def warpper(scope, receive, **kwargs):
-                return await func(scope, receive, **kwargs)
-
-            node.app = warpper
+            node.app = func
 
         return decorator
 
     def redirect(self, code: int, path: AvailableRoutePath, redirect_to: str):
+        """
+        301 Moved Permanently 永久移动
+
+        302 Found 临时移动
+
+        303 See Other 其他地址
+
+        307 Temporary Redirect 临时重定向
+
+        308 Permanent Redirect 永久重定向
+        """
         route_map = self.set_route(path)
-        route_map.response = Response(code, [(b"Location", redirect_to.encode())])
+        route_map.response = Response(code, [(b"Location", redirect_to.encode(encoding="utf-8"))])
 
     def directory(
         self,
@@ -190,14 +204,16 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
         """
         if isinstance(src_path, str):
             src_path = Path(src_path)
-        for src_sp in src_path.iterdir():
-            k = RoutePath(src_sp)[-1]
-            route_map = self[k] = RouteMap(src_sp.is_dir())
-            if route_map.is_dir:
-                route_map.directory(src_sp, html)
+
+        for inner_src_path in src_path.iterdir():
+            key = urllib.parse.quote(str(inner_src_path.as_posix()).strip("/").split("/")[-1])
+            is_dir = inner_src_path.is_dir()
+            route_map = self[key] = RouteMap(is_dir=is_dir)
+            if is_dir:
+                route_map.directory(inner_src_path, html)
                 continue
-            route_map.file(src_path, for_router, for_response)
-            if html and src_sp.name == "index.html":
+            route_map.file(inner_src_path, for_router, for_response)
+            if html and inner_src_path.name == "index.html":
                 self.app = route_map.app
                 self.response = route_map.response
 
@@ -219,12 +235,11 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
         @self.router()
         async def _(scope, receive):
             with open(src_path, "rb") as f:
-                response = Response(
+                return Response(
                     code=200,
                     headers=Response.content_type(src_path.suffix),
                     bodys=[f.read()],
                 )
-                return response
 
     def file_for_response(self, src_path: Path):
         with open(src_path, "rb") as f:
