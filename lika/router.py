@@ -2,7 +2,7 @@ from collections.abc import Coroutine, Callable, MutableMapping, Sequence
 from typing import overload
 from pathlib import Path
 import urllib.parse
-from .response import Response, Headers
+from .response import Response
 
 type AvailableRoutePath = str | Path | list[str] | RoutePath
 
@@ -176,12 +176,20 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
 
     def directory(
         self,
-        src_path: Path,
+        src_path: Path | str,
         html: bool = False,
         for_router: set = set(),
         for_response: set = {".html", ".js", ".txt", ".json"},
     ):
-        src_path = Path(src_path)
+        """
+        把文件夹作为路由
+            src_path: 路由文件夹路径
+            html: 根目录默认为此目录下 index.html
+            for_router: 动态响应文件后缀
+            for_response: 静态响应文件后缀
+        """
+        if isinstance(src_path, str):
+            src_path = Path(src_path)
         for src_sp in src_path.iterdir():
             k = RoutePath(src_sp)[-1]
             route_map = self[k] = RouteMap(src_sp.is_dir())
@@ -220,9 +228,8 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
 
     def file_for_response(self, src_path: Path):
         with open(src_path, "rb") as f:
-            response = Response(
+            self.response = Response(
                 code=200,
                 headers=Response.content_type(src_path.suffix),
                 bodys=[f.read()],
             )
-        self.response = response
