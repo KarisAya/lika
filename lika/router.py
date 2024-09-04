@@ -31,6 +31,9 @@ class RoutePath(Sequence[str]):
     def __iter__(self):
         return iter(self._data)
 
+    def __bool__(self) -> bool:
+        return bool(self._data)
+
     def __init__(self, data: AvailableRoutePath):
         if isinstance(data, RoutePath):
             self._data = data._data
@@ -142,6 +145,11 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
         """
         if not isinstance(path, RoutePath):
             path = RoutePath(path)
+        if not path:
+            if route_map:
+                for k, v in vars(route_map).items():
+                    setattr(self, k, v)
+            return self
         node: RouteMap = self
         for key in path[:-1]:
             if key in node._data:
@@ -155,6 +163,8 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
         if isinstance(path, str):
             node = self
             for x in path.strip("/").split("/"):
+                if not x:
+                    continue
                 if x.startswith("{") and x.endswith("}"):
                     kwargs["keyword"] = x[1:-1]
                     key = "{id}"
@@ -164,9 +174,6 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
                     node = node._data[key]
                 else:
                     node = node._data[key] = RouteMap()
-
-        else:
-            node = self.set_route(path)
 
         def decorator(func: Callable[..., Coroutine]):
             node.app = func
@@ -188,12 +195,15 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
         route_map = self.set_route(path)
         route_map.response = Response(code, [(b"Location", redirect_to.encode(encoding="utf-8"))])
 
+    for_router: set[str] = set()
+    for_response: set[str] = {".html", ".js", ".txt", ".json"}
+
     def directory(
         self,
         src_path: Path | str,
         html: bool = False,
-        for_router: set = set(),
-        for_response: set = {".html", ".js", ".txt", ".json"},
+        for_router: set = for_router,
+        for_response: set = for_response,
     ):
         """
         把文件夹作为路由
@@ -212,19 +222,26 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
             if is_dir:
                 route_map.directory(inner_src_path, html)
                 continue
-            route_map.file(inner_src_path, for_router, for_response)
+
+            route_map.file(inner_src_path, for_router=for_router, for_response=for_response)
+
             if html and inner_src_path.name == "index.html":
                 self.app = route_map.app
                 self.response = route_map.response
 
-    def file(self, src_path: Path, for_router: set, for_response: set):
+    def file(
+        self,
+        src_path: Path,
+        for_router: set = for_router,
+        for_response: set = for_response,
+    ):
         if for_router:
-            if src_path.suffix in for_router:
+            if src_path.suffix in self.for_router:
                 self.file_for_router(src_path)
             else:
                 self.file_for_response(src_path)
         elif for_response:
-            if src_path.suffix in for_response:
+            if src_path.suffix in self.for_response:
                 self.file_for_response(src_path)
             else:
                 self.file_for_router(src_path)
@@ -232,14 +249,15 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
             self.file_for_router(src_path)
 
     def file_for_router(self, src_path: Path):
-        @self.router()
-        async def _(scope, receive):
+        async def func(scope, receive):
             with open(src_path, "rb") as f:
                 return Response(
                     code=200,
                     headers=Response.content_type(src_path.suffix),
                     bodys=[f.read()],
                 )
+
+        self.app = func
 
     def file_for_response(self, src_path: Path):
         with open(src_path, "rb") as f:

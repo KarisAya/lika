@@ -28,7 +28,7 @@ class Response:
 
     @staticmethod
     def content_type(ext: str) -> Headers:
-        match ext.lstrip("."):
+        match ext := ext.lstrip("."):
             case "html":
                 return [(b"Content-type", b"text/html")]
             case "js":
