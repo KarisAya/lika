@@ -133,6 +133,12 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
             response = await self.app(scope, receive, **kwargs)
         return response
 
+    def find_route(self, route_path: RoutePath):
+        node = self
+        for key in route_path:
+            node = node[key]
+        return node
+
     def create_route(self, route_path: AvailableRoutePath):
         """
         创建路由

@@ -27,13 +27,15 @@ class Server:
         node = self.route_map
         kwargs = {}
         for key in urllib.parse.unquote(path).strip("/").split("/"):
+            if key == WILDCARD:
+                return
             if key in node:
                 node = node[key]
             elif WILDCARD in node:
                 node = node[key]
                 kwargs[node.keyword] = key
             else:
-                return None
+                return
             node = node[key]
         return node, kwargs
 
