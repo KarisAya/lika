@@ -30,11 +30,10 @@ class Server:
             if key in node:
                 node = node[key]
             elif WILDCARD in node:
-                node = node[key]
+                node = node[WILDCARD]
                 kwargs[node.keyword] = key
             else:
                 return
-            node = node[key]
         return node, kwargs
 
 
