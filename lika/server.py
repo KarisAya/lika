@@ -6,16 +6,17 @@ import urllib.parse
 class Server:
     def __init__(self):
         self.route_map: RouteMap = RouteMap()
-        self.error: dict[int, Response] = {i: Response(i) for i in range(400, 418)}
+        self.NotFound: Response = Response(404)
 
     async def __call__(self, scope, receive, send):
         data = self.find_route(scope["path"])
         if data is None:
-            return self.error[404]
-        node, kwargs = data
-        response = await node(scope, receive, **kwargs)
+            response = self.NotFound
+        else:
+            node, kwargs = data
+            response = await node(scope, receive, **kwargs)
         if response is None:
-            return self.error[404]
+            response = self.NotFound
         await send(response.start)
         for body in response.bodys:
             await send(body)
