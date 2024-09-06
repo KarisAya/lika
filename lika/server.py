@@ -21,9 +21,6 @@ class Server:
             await send(body)
 
     def find_route(self, path: str):
-        """
-        查找路由
-        """
         node = self.route_map
         kwargs = {}
         for key in urllib.parse.unquote(path).strip("/").split("/"):
