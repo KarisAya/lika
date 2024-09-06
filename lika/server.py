@@ -1,40 +1,41 @@
-from .router import RouteMap
+from .router import RouteMap, WILDCARD
 from .response import Response
+import urllib.parse
 
 
 class Server:
     def __init__(self):
         self.route_map: RouteMap = RouteMap()
-        self.error = RouteMap()
-        for i in range(400, 419):
-            self.error[str(i)] = RouteMap()
+        self.error: dict[int, Response] = {i: Response(i) for i in range(400, 418)}
 
     async def __call__(self, scope, receive, send):
-        node = self.route_map
-        path: str = scope["path"]
-        kwargs = {}
-        for k in path.strip("/").split("/"):
-            if not k:
-                continue
-            if k in node:
-                node = node[k]
-            elif "{id}" in node:
-                node = node["{id}"]
-                assert node.keyword is not None
-                kwargs[node.keyword] = k
-            else:
-                response = await self.error["404"](scope, receive)
-                break
-        else:
-            response = await node(scope, receive, **kwargs)
-            if not response:
-                response = await self.error["404"](scope, receive)
-
-        assert isinstance(response, Response)
-
+        data = self.find_route(scope["path"])
+        if data is None:
+            return self.error[404]
+        node, kwargs = data
+        response = await node(scope, receive, **kwargs)
+        if response is None:
+            return self.error[404]
         await send(response.start)
         for body in response.bodys:
             await send(body)
+
+    def find_route(self, path: str):
+        """
+        查找路由
+        """
+        node = self.route_map
+        kwargs = {}
+        for key in urllib.parse.unquote(path).strip("/").split("/"):
+            if key in node:
+                node = node[key]
+            elif WILDCARD in node:
+                node = node[key]
+                kwargs[node.keyword] = key
+            else:
+                return None
+            node = node[key]
+        return node, kwargs
 
 
 # def proxy(self, key: str, url: str):

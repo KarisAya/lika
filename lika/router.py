@@ -4,6 +4,8 @@ from pathlib import Path
 import urllib.parse
 from .response import Response
 
+WILDCARD = r"{id}"
+
 type AvailableRoutePath = str | Path | list[str] | RoutePath
 
 
@@ -38,17 +40,16 @@ class RoutePath(Sequence[str]):
         if isinstance(data, RoutePath):
             self._data = data._data
             return
-        if isinstance(data, Path):
-            result = urllib.parse.quote(str(data.as_posix())).strip("/").split("/")
+        elif isinstance(data, Path):
+            data = data.as_posix().strip("/").split("/")
         elif isinstance(data, str):
-            result = urllib.parse.quote(data.replace("\\", "/")).strip("/").split("/")
+            data = data.replace("\\", "/").strip("/").split("/")
         elif isinstance(data, list):
             if not all(isinstance(x, str) for x in data):
                 raise TypeError(f"{data} is not a valid path")
-            result = data
         else:
             raise TypeError(f"{data} is not a valid path")
-        self._data = result[1:] if result and result[0] == "" else result
+        self._data = [x for x in data if x]
 
     def __add__(self, other: AvailableRoutePath):
         if isinstance(other, RoutePath):
@@ -64,23 +65,29 @@ class RoutePath(Sequence[str]):
 
     @property
     def url(self) -> str:
-        return "".join(f"/{x}" for x in self) or "/"
+        return urllib.parse.quote(self.path)
 
     @property
     def path(self) -> str:
-        return urllib.parse.unquote(self.url)
+        return "".join(f"/{x}" for x in self) or "/"
 
     @property
     def name(self) -> str:
-        return urllib.parse.unquote((self or ["/"])[-1])
+        try:
+            return self[-1]
+        except IndexError:
+            return "/"
 
 
 class RouteMap(MutableMapping[str, "RouteMap"]):
     _data: dict[str, "RouteMap"]
-    app: Callable[..., Coroutine] | None = None
+    app: Callable[..., Coroutine[None, None, Response | None]] | None = None
 
     def __getitem__(self, key: str) -> "RouteMap":
-        return self._data[key]
+        try:
+            return self._data[key]
+        except KeyError:
+            raise RoutePathError(f"{key} are not exist")
 
     def __setitem__(self, key: str, value: "RouteMap"):
         self._data[key] = value
@@ -115,70 +122,46 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
         self.is_dir = is_dir
         self.response = response
         self.keyword = keyword
-        self.kwargs = {}
 
-    async def __call__(self, scope, receive, **kwargs) -> Response | None:
+    async def __call__(self, scope, receive, /, **kwargs):
         """
         执行 ASGI 发送方法
         """
         if self.app is None:
-            response = self.response or Response(404)
+            response = self.response
         else:
             response = await self.app(scope, receive, **kwargs)
         return response
 
-    def route_to(self, key: str) -> "RouteMap":
+    def create_route(self, route_path: AvailableRoutePath):
         """
-        获取子路由
+        创建路由
         """
-        if key not in self._data:
-            raise RoutePathError(f"'{key}' are not exist in this routemap")
-        return self._data[key]
-
-    def set_route(self, path: AvailableRoutePath, route_map: "RouteMap | None" = None) -> "RouteMap":
-        """
-        设置路由
-            path: 路径: 在设置路径中, 如果路径中包含 {xxx} 则会自动匹配路由
-            route_map: 设置此节点子路由，为空则是空路由
-        """
-        if not isinstance(path, RoutePath):
-            path = RoutePath(path)
-        if not path:
-            if route_map:
-                for k, v in vars(route_map).items():
-                    setattr(self, k, v)
-            return self
-        node: RouteMap = self
-        for key in path[:-1]:
-            if key in node._data:
-                node = node._data[key]
+        node = self
+        for key in RoutePath(route_path):
+            if key in node:
+                node = node[key]
+            elif WILDCARD in node:
+                node = node[key]
             else:
-                node = node._data[key] = RouteMap()
-        node = node._data[path[-1]] = route_map or RouteMap()
+                if key.startswith("{") and key.endswith("}"):
+                    keyword = key[1:-1]
+                    key = WILDCARD
+                else:
+                    keyword = None
+                node[key] = RouteMap(keyword=keyword)
+                node = node[key]
         return node
 
-    def router(self, path: AvailableRoutePath = "/", **kwargs):
-        if isinstance(path, str):
-            node = self
-            for x in path.strip("/").split("/"):
-                if not x:
-                    continue
-                if x.startswith("{") and x.endswith("}"):
-                    kwargs["keyword"] = x[1:-1]
-                    key = "{id}"
-                else:
-                    key = urllib.parse.quote(x)
-                if key in node._data:
-                    node = node._data[key]
-                else:
-                    node = node._data[key] = RouteMap()
+    def router(self, route_path: AvailableRoutePath = "/"):
+        node = self.create_route(route_path)
 
         def decorator(func: Callable[..., Coroutine]):
             node.app = func
 
         return decorator
 
-    def redirect(self, code: int, path: AvailableRoutePath, redirect_to: str):
+    def redirect(self, code: int, route_path: AvailableRoutePath, redirect_to: str):
         """
         301 Moved Permanently 永久移动
 
@@ -190,7 +173,7 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
 
         308 Permanent Redirect 永久重定向
         """
-        self.set_route(path).response = Response(code, [(b"Location", redirect_to.encode(encoding="utf-8"))])
+        self.create_route(route_path).response = Response(code, [(b"Location", redirect_to.encode(encoding="utf-8"))])
 
     for_router: set[str] = set()
     for_response: set[str] = {".html", ".js", ".txt", ".json"}
@@ -199,29 +182,23 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
         self,
         src_path: Path | str,
         html: bool = False,
-        for_router: set = for_router,
-        for_response: set = for_response,
     ):
         """
         把文件夹作为路由
             src_path: 路由文件夹路径
             html: 根目录默认为此目录下 index.html
-            for_router: 动态响应文件后缀
-            for_response: 静态响应文件后缀
         """
         if isinstance(src_path, str):
             src_path = Path(src_path)
 
         for inner_src_path in src_path.iterdir():
-            key = urllib.parse.quote(str(inner_src_path.as_posix()).strip("/").split("/")[-1])
+            key = inner_src_path.name
             is_dir = inner_src_path.is_dir()
             route_map = self[key] = RouteMap(is_dir=is_dir)
             if is_dir:
                 route_map.directory(inner_src_path, html)
                 continue
-
-            route_map.file(inner_src_path, for_router=for_router, for_response=for_response)
-
+            route_map.file(inner_src_path)
             if html and inner_src_path.name == "index.html":
                 self.app = route_map.app
                 self.response = route_map.response
@@ -229,15 +206,13 @@ class RouteMap(MutableMapping[str, "RouteMap"]):
     def file(
         self,
         src_path: Path,
-        for_router: set = for_router,
-        for_response: set = for_response,
     ):
-        if for_router:
+        if self.for_router:
             if src_path.suffix in self.for_router:
                 self.file_for_router(src_path)
             else:
                 self.file_for_response(src_path)
-        elif for_response:
+        elif self.for_response:
             if src_path.suffix in self.for_response:
                 self.file_for_response(src_path)
             else:

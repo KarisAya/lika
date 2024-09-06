@@ -19,7 +19,7 @@ class Response:
         ]
         self.bodys[-1]["more_body"] = False
         str(sum(map(len, bodys)))
-        headers.append((b"Content-Length", str(sum(map(len, bodys))).encode("ascii")))
+        headers.append((b"Content-Length", str(sum(map(len, bodys))).encode("utf-8")))
         self.start = {
             "type": "http.response.start",
             "status": code,
